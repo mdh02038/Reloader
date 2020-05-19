@@ -101,7 +101,7 @@ spec:
     spec:
       containers:
       - env:
-        image: "stakater/reloader:v0.0.58"
+        image: "raquette/reloader:v0.0.58"
         imagePullPolicy: IfNotPresent
         name: reloader-reloader
         args:
