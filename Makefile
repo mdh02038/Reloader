@@ -35,8 +35,7 @@ binary-image: builder-image
 	@docker run --network host --rm "${BUILDER}" | docker buildx build --platform ${OS}/${ARCH} --network host -t "${REPOSITORY_ARCH}" -f Dockerfile.run -
 
 
-#release: builder-image binary-image manifest
-release: manifest
+release: builder-image binary-image manifest
 	@docker push ${REPOSITORY_ARCH}
 
 release-all:
