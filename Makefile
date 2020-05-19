@@ -1,13 +1,17 @@
 # note: call scripts from /scripts
 
-.PHONY: default build builder-image binary-image test stop clean-images clean push apply deploy
+.PHONY: default build builder-image binary-image test stop clean-images clean push apply deploy release release-all manifest
 
-BUILDER ?= reloader-builder
+OS ?= linux
+ARCH ?= ??? 
+ALL_ARCH ?= arm64 amd64
+BUILDER ?= reloader-builder-${ARCH}
 BINARY ?= Reloader
-DOCKER_IMAGE ?= stakater/reloader
+DOCKER_IMAGE ?= raquette/reloader
 # Default value "dev"
-DOCKER_TAG ?= 1.0.0
-REPOSITORY = ${DOCKER_IMAGE}:${DOCKER_TAG}
+TAG ?= 1.0.0
+REPOSITORY_GENERIC = ${DOCKER_IMAGE}:${TAG}
+REPOSITORY_ARCH = ${DOCKER_IMAGE}:${TAG}-${ARCH}
 
 VERSION=$(shell cat .version)
 BUILD=
@@ -25,10 +29,29 @@ build:
 	"$(GOCMD)" build ${GOFLAGS} ${LDFLAGS} -o "${BINARY}"
 
 builder-image:
-	@docker build --network host -t "${BUILDER}" -f build/package/Dockerfile.build .
+	@docker buildx build --platform ${OS}/${ARCH} --network host -t "${BUILDER}" -f build/package/Dockerfile.build .
 
 binary-image: builder-image
-	@docker run --network host --rm "${BUILDER}" | docker build --network host -t "${REPOSITORY}" -f Dockerfile.run -
+	@docker run --network host --rm "${BUILDER}" | docker buildx build --platform ${OS}/${ARCH} --network host -t "${REPOSITORY_ARCH}" -f Dockerfile.run -
+
+
+#release: builder-image binary-image manifest
+release: manifest
+	@docker push ${REPOSITORY_ARCH}
+
+release-all:
+	(set -e ; $(foreach arch,$(ALL_ARCH), \
+		make release ARCH=${arch} ; \
+	))
+	(set -e ; \
+                docker manifest push $(REPOSITORY_GENERIC); \
+	)
+
+manifest:
+	(set -e ; \
+		docker manifest create -a $(REPOSITORY_GENERIC) $(REPOSITORY_ARCH); \
+		docker manifest annotate --arch $(ARCH) $(REPOSITORY_GENERIC)  $(REPOSITORY_ARCH); \
+	)
 
 test:
 	"$(GOCMD)" test -timeout 1800s -v ./...
@@ -48,4 +71,5 @@ push: ## push the latest Docker image to DockerHub
 apply:
 	kubectl apply -f deployments/manifests/ -n temp-reloader
 
-deploy: binary-image push apply
+deploy: binary-image push applyo
+
