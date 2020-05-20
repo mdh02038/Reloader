@@ -29,7 +29,7 @@ build:
 	"$(GOCMD)" build ${GOFLAGS} ${LDFLAGS} -o "${BINARY}"
 
 builder-image:
-	docker buildx build --platform ${OS}/${ARCH} --network host -t "${BUILDER}" -f build/package/Dockerfile.build .
+	docker buildx build --platform ${OS}/${ARCH} --build-arg GOARCH=$(ARCH) --network host -t "${BUILDER}" -f build/package/Dockerfile.build .
 
 binary-image: builder-image
 	@docker run --network host --rm "${BUILDER}" | docker buildx build --platform ${OS}/${ARCH} --network host -t "${REPOSITORY_ARCH}" -f Dockerfile.run -
