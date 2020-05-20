@@ -1,6 +1,6 @@
 # note: call scripts from /scripts
 
-.PHONY: default build builder-image binary-image test stop clean-images clean push apply deploy release release-all manifest
+.PHONY: default build builder-image binary-image test stop clean-images clean push apply deploy release release-all manifest push
 
 OS ?= linux
 ARCH ?= ??? 
@@ -9,7 +9,7 @@ BUILDER ?= reloader-builder-${ARCH}
 BINARY ?= Reloader
 DOCKER_IMAGE ?= raquette/reloader
 # Default value "dev"
-TAG ?= 1.0.0
+TAG ?= v0.0.58
 REPOSITORY_GENERIC = ${DOCKER_IMAGE}:${TAG}
 REPOSITORY_ARCH = ${DOCKER_IMAGE}:${TAG}-${ARCH}
 
@@ -29,14 +29,15 @@ build:
 	"$(GOCMD)" build ${GOFLAGS} ${LDFLAGS} -o "${BINARY}"
 
 builder-image:
-	@docker buildx build --platform ${OS}/${ARCH} --network host -t "${BUILDER}" -f build/package/Dockerfile.build .
+	docker buildx build --platform ${OS}/${ARCH} --network host -t "${BUILDER}" -f build/package/Dockerfile.build .
 
 binary-image: builder-image
 	@docker run --network host --rm "${BUILDER}" | docker buildx build --platform ${OS}/${ARCH} --network host -t "${REPOSITORY_ARCH}" -f Dockerfile.run -
 
+push:
+	docker push ${REPOSITORY_ARCH}
 
-release: builder-image binary-image manifest
-	@docker push ${REPOSITORY_ARCH}
+release: builder-image binary-image push manifest
 
 release-all:
 	(set -e ; $(foreach arch,$(ALL_ARCH), \
@@ -56,16 +57,14 @@ test:
 	"$(GOCMD)" test -timeout 1800s -v ./...
 
 stop:
-	@docker stop "${BINARY}"
+	docker stop "${BINARY}"
 
 clean-images: stop
-	@docker rmi "${BUILDER}" "${BINARY}"
+	docker rmi "${BUILDER}" "${BINARY}"
 
 clean:
 	"$(GOCMD)" clean -i
 
-push: ## push the latest Docker image to DockerHub
-	docker push $(REPOSITORY)
 
 apply:
 	kubectl apply -f deployments/manifests/ -n temp-reloader
